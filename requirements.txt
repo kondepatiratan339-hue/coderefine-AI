@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+PyJWT
+bcrypt
+google-genai
+mistralai
+python-dotenv

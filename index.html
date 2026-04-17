@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Code Refine AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f3f4f7;
+      --fg: #12151e;
+      --border: #dde0e8;
+      --card: #ffffff;
+      --muted: #8892a4;
+      --primary: #7c3aed;
+      --primary-fg: #ffffff;
+      --primary-hover: #6d28d9;
+      --sidebar-bg: #181e2e;
+      --sidebar-fg: #e2e8f0;
+      --sidebar-muted: #8892a4;
+      --sidebar-border: #252d42;
+      --sidebar-accent: #232c40;
+      --sidebar-accent-hover: #2a3550;
+      --sidebar-selected: rgba(124,58,237,0.18);
+      --danger: #dc2626;
+      --code-bg: #0d1117;
+      --code-fg: #e2e8f0;
+      --code-header: #090d14;
+      --radius: 8px;
+      --font: 'Inter', sans-serif;
+      --mono: 'JetBrains Mono', Menlo, monospace;
+    }
+
+    html, body { height: 100%; font-family: var(--font); background: var(--bg); color: var(--fg); }
+
+    #app { display: flex; height: 100vh; overflow: hidden; }
+
+    /* Sidebar */
+    #sidebar {
+      width: 272px; min-width: 272px;
+      display: flex; flex-direction: column;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--sidebar-border);
+      transition: width 0.25s ease, min-width 0.25s ease;
+      overflow: hidden;
+    }
+    #sidebar.collapsed { width: 0; min-width: 0; }
+
+    .sidebar-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 18px 16px 16px;
+      border-bottom: 1px solid var(--sidebar-border);
+      white-space: nowrap;
+    }
+    .brand-icon {
+      width: 34px; height: 34px;
+      background: var(--primary); border-radius: 9px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .brand-icon svg { width: 18px; height: 18px; color: #fff; }
+    .brand-title { font-size: 13px; font-weight: 600; color: var(--sidebar-fg); }
+    .brand-sub { font-size: 11px; color: var(--sidebar-muted); }
+
+    .sidebar-new-btn {
+      margin: 12px 10px 6px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 7px 12px;
+      background: var(--sidebar-accent);
+      border: 1px solid var(--sidebar-border); border-radius: var(--radius);
+      color: var(--sidebar-fg); font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: background 0.15s; white-space: nowrap;
+    }
+    .sidebar-new-btn:hover { background: var(--sidebar-accent-hover); }
+    .sidebar-new-btn svg { width: 14px; height: 14px; }
+
+    .sidebar-section-label {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px 4px;
+      font-size: 11px; font-weight: 500; color: var(--sidebar-muted); white-space: nowrap;
+    }
+
+    #session-list { flex: 1; overflow-y: auto; padding: 2px 8px 12px; }
+    #session-list::-webkit-scrollbar { width: 4px; }
+    #session-list::-webkit-scrollbar-thumb { background: var(--sidebar-border); border-radius: 2px; }
+
+    .session-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 10px; border-radius: 6px; cursor: pointer;
+      color: var(--sidebar-muted); transition: background 0.12s, color 0.12s;
+      gap: 8px; white-space: nowrap;
+    }
+    .session-item:hover { background: var(--sidebar-accent); color: var(--sidebar-fg); }
+    .session-item.active { background: var(--sidebar-selected); color: var(--sidebar-fg); }
+    .session-info { flex: 1; min-width: 0; }
+    .session-name { font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+    .session-badge {
+      display: inline-block; margin-top: 3px; padding: 1px 6px;
+      font-size: 10px; border-radius: 4px;
+      border: 1px solid var(--sidebar-border); color: var(--sidebar-muted);
+    }
+    .session-delete {
+      opacity: 0; background: none; border: none; cursor: pointer;
+      padding: 3px; border-radius: 4px; color: var(--sidebar-muted);
+      transition: opacity 0.12s, color 0.12s; flex-shrink: 0;
+    }
+    .session-item:hover .session-delete { opacity: 1; }
+    .session-delete:hover { color: var(--danger); }
+    .session-delete svg { width: 13px; height: 13px; display: block; }
+    .sidebar-empty { padding: 28px 16px; text-align: center; color: var(--sidebar-muted); font-size: 12px; line-height: 1.6; }
+
+    /* Main */
+    #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+    #topbar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; background: var(--card);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    #toggle-btn {
+      width: 30px; height: 30px; background: none; border: none;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 6px; cursor: pointer; color: var(--muted);
+      transition: background 0.12s, color 0.12s;
+    }
+    #toggle-btn:hover { background: var(--bg); color: var(--fg); }
+    #toggle-btn svg { width: 16px; height: 16px; }
+    .topbar-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+    .topbar-title svg { width: 18px; height: 18px; color: var(--primary); }
+    #topbar-lang-badge {
+      margin-left: auto; padding: 2px 10px; font-size: 11px;
+      border: 1px solid var(--border); border-radius: 20px; color: var(--muted); display: none;
+    }
+
+    /* Panels */
+    #panels { flex: 1; display: flex; overflow: hidden; }
+    .panel { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    #input-panel { border-right: 1px solid var(--border); }
+
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; background: rgba(255,255,255,0.6);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .panel-header-left { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; }
+    .panel-header-left svg { width: 15px; height: 15px; color: var(--muted); }
+
+    #lang-select {
+      padding: 4px 10px; font-size: 12px;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: var(--card); color: var(--fg); cursor: pointer;
+      font-family: var(--font); outline: none;
+    }
+    #lang-select:focus { border-color: var(--primary); }
+
+    #code-input-wrap { flex: 1; padding: 14px; min-height: 0; display: flex; flex-direction: column; }
+    #code-input {
+      flex: 1; width: 100%; padding: 14px;
+      font-family: var(--mono); font-size: 13px; line-height: 1.65;
+      background: var(--card); color: var(--fg);
+      border: 1.5px dashed var(--border); border-radius: var(--radius);
+      resize: none; outline: none; transition: border-color 0.15s; tab-size: 2;
+    }
+    #code-input:focus { border-color: rgba(124,58,237,0.45); border-style: solid; }
+    #code-input::placeholder { color: var(--muted); font-family: var(--mono); }
+
+    #btn-wrap { padding: 0 14px 14px; flex-shrink: 0; }
+    #refine-btn {
+      width: 100%; padding: 11px;
+      background: var(--primary); color: var(--primary-fg);
+      font-family: var(--font); font-size: 14px; font-weight: 600;
+      border: none; border-radius: var(--radius); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    #refine-btn:hover:not(:disabled) { background: var(--primary-hover); }
+    #refine-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    #refine-btn svg { width: 16px; height: 16px; }
+
+    #output-panel { overflow: hidden; }
+    #output-scroll { flex: 1; overflow-y: auto; padding: 16px; }
+
+    /* Empty state */
+    #empty-state {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 100%; min-height: 300px;
+      text-align: center; padding: 32px;
+    }
+    .empty-icon {
+      width: 64px; height: 64px; background: rgba(124,58,237,0.1);
+      border-radius: 16px; display: flex; align-items: center;
+      justify-content: center; margin-bottom: 16px;
+    }
+    .empty-icon svg { width: 32px; height: 32px; color: var(--primary); }
+    .empty-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+    .empty-desc { font-size: 13px; color: var(--muted); line-height: 1.6; max-width: 300px; }
+
+    /* Streaming */
+    #streaming-box { display: none; }
+    .streaming-label {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 13px; color: var(--muted); margin-bottom: 12px;
+    }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #stream-text {
+      background: rgba(0,0,0,0.04); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px;
+      font-family: var(--mono); font-size: 12px; color: var(--muted);
+      white-space: pre-wrap; line-height: 1.6; max-height: 300px;
+      overflow-y: auto; display: none;
+    }
+
+    /* Result */
+    #result-box { display: none; }
+    .result-section { margin-bottom: 20px; }
+    .result-section-title {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 600; margin-bottom: 8px;
+    }
+    .result-section-title svg { width: 15px; height: 15px; color: var(--primary); }
+
+    .code-block { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .code-block-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 14px; background: var(--code-header);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .code-block-lang { font-size: 11px; font-family: var(--mono); color: #8892a4; }
+    .copy-btn {
+      display: flex; align-items: center; gap: 5px; font-size: 11px;
+      background: none; border: none; color: #8892a4; cursor: pointer;
+      padding: 2px 6px; border-radius: 4px;
+      transition: color 0.12s, background 0.12s; font-family: var(--font);
+    }
+    .copy-btn:hover { color: #e2e8f0; background: rgba(255,255,255,0.06); }
+    .copy-btn svg { width: 13px; height: 13px; }
+    .code-block pre { background: var(--code-bg); padding: 16px; overflow-x: auto; margin: 0; }
+    .code-block code {
+      font-family: var(--mono); font-size: 13px;
+      color: var(--code-fg); white-space: pre; line-height: 1.65;
+    }
+
+    .explanation-box {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+    }
+    .explanation-box p { font-size: 13.5px; line-height: 1.7; white-space: pre-wrap; }
+
+    /* History */
+    #history-box { display: none; }
+    .history-label { font-size: 11px; font-weight: 500; color: var(--muted); margin-bottom: 16px; }
+    .history-item { padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+    .history-item:last-child { border-bottom: none; }
+    .history-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .history-lang-badge { padding: 2px 8px; font-size: 11px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); }
+    .history-time { font-size: 11px; color: var(--muted); }
+    .history-latest { margin-left: auto; padding: 2px 8px; font-size: 11px; background: var(--primary); color: #fff; border-radius: 4px; }
+
+    /* Modal */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    #modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px; max-width: 380px; width: 90%;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.18);
+    }
+    .modal h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+    .modal p { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .modal-cancel, .modal-confirm {
+      padding: 7px 16px; border-radius: 6px;
+      font-size: 13px; font-weight: 500; font-family: var(--font);
+      cursor: pointer; border: 1px solid var(--border);
+    }
+    .modal-cancel { background: var(--card); color: var(--fg); }
+    .modal-cancel:hover { background: var(--bg); }
+    .modal-confirm { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: #1e293b; color: #f1f5f9;
+      padding: 10px 16px; border-radius: var(--radius);
+      font-size: 13px; font-weight: 500;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      z-index: 200; opacity: 0; transition: opacity 0.2s; pointer-events: none;
+    }
+    #toast.show { opacity: 1; }
+
+    /* Error Highlights */
+    .error-highlight {
+      background: #fee2e2; border: 2px solid #dc2626; border-radius: 4px;
+      padding: 2px 4px; display: inline-block; margin: 0 2px;
+    }
+    .fixed-highlight {
+      background: #dcfce7; border: 2px solid #16a34a; border-radius: 4px;
+      padding: 2px 4px; display: inline-block; margin: 0 2px;
+    }
+
+    /* Side-by-side comparison */
+    .comparison-container {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+      margin-bottom: 20px;
+    }
+    .comparison-panel {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .comparison-header {
+      padding: 10px 14px; background: var(--code-header);
+      border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px;
+      font-weight: 600; color: #8892a4;
+    }
+    .comparison-header.bad { color: #dc2626; }
+    .comparison-header.good { color: #16a34a; }
+
+    /* Changes section */
+    .changes-container { margin-bottom: 20px; }
+    .change-item {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02);
+    }
+    .change-title { font-weight: 600; color: var(--primary); font-size: 13px; margin-bottom: 6px; }
+    .change-reason { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 6px; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand-icon">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">Code Refine AI</div>
+        <div class="brand-sub">AI-powered code fixer</div>
+      </div>
+    </div>
+
+    <button class="sidebar-new-btn" id="new-session-btn">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+      </svg>
+      New Session
+    </button>
+
+    <div class="sidebar-section-label">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:12px;height:12px">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      History
+    </div>
+
+    <div id="session-list">
+      <div class="sidebar-empty">No sessions yet.<br/>Start a new session above.</div>
+    </div>
+  </aside>
+
+  <div id="main">
+    <div id="topbar">
+      <button id="toggle-btn">
+        <svg id="toggle-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <div class="topbar-title">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+        </svg>
+        <span id="topbar-title-text">Code Refine AI</span>
+      </div>
+      <span id="topbar-lang-badge"></span>
+    </div>
+
+    <div id="panels">
+      <!-- Input Panel -->
+      <div class="panel" id="input-panel">
+        <div class="panel-header">
+          <div class="panel-header-left">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+            </svg>
+            Input Code
+          </div>
+          <select id="lang-select">
+            <option value="python">Python</option>
+            <option value="java">Java (Spring/Maven)</option>
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="go">Go</option>
+            <option value="rust">Rust</option>
+            <option value="c++">C++</option>
+            <option value="c#">C#</option>
+            <option value="sql">SQL</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div id="code-input-wrap">
+          <textarea id="code-input" spellcheck="false"
+            placeholder="Paste your code here..."></textarea>
+        </div>
+
+        <div id="btn-wrap">
+          <button id="refine-btn">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 3l14 9-14 9V3z"/>
+            </svg>
+            <span id="refine-btn-text">Refine Code</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Output Panel -->
+      <div class="panel" id="output-panel">
+        <div class="panel-header">
+          <div class="panel-header-left">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 3l14 9-14 9V3z"/>
+            </svg>
+            Refined Output
+          </div>
+          <span id="refinement-count" style="font-size:12px;color:var(--muted);"></span>
+        </div>
+
+        <div id="output-scroll">
+          <div id="empty-state">
+            <div class="empty-icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 3l14 9-14 9V3z"/>
+              </svg>
+            </div>
+            <div class="empty-title">Ready to refine your code</div>
+            <div class="empty-desc">Paste your code, select the language, and hit <strong>Refine Code</strong>.</div>
+          </div>
+
+          <div id="streaming-box">
+            <div class="streaming-label">
+              <svg class="spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;color:var(--primary)">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              AI is analyzing and refining your code...
+            </div>
+            <div id="stream-text"></div>
+          </div>
+
+          <div id="result-box">
+            <div class="result-section">
+              <div class="result-section-title">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                </svg>
+                Refined Code
+              </div>
+              <div class="code-block">
+                <div class="code-block-header">
+                  <span class="code-block-lang" id="result-lang-label"></span>
+                  <button class="copy-btn" onclick="copyCode('result-code-content', this)">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                    Copy
+                  </button>
+                </div>
+                <pre><code id="result-code-content"></code></pre>
+              </div>
+            </div>
+            <div class="result-section">
+              <div class="result-section-title">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                </svg>
+                Explanation
+              </div>
+              <div class="explanation-box"><p id="result-explanation"></p></div>
+            </div>
+
+            <div class="result-section" id="comparison-section" style="display:none;">
+              <div class="result-section-title">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                Side-by-Side Comparison
+              </div>
+              <div class="comparison-container" id="comparison-container"></div>
+            </div>
+
+            <div class="result-section" id="changes-section" style="display:none;">
+              <div class="result-section-title">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Errors Fixed
+              </div>
+              <div class="changes-container" id="changes-container"></div>
+            </div>
+          </div>
+
+          <div id="history-box">
+            <div class="history-label">Previous refinements in this session</div>
+            <div id="history-items"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div id="modal-overlay">
+  <div class="modal">
+    <h3>Delete session?</h3>
+    <p id="modal-desc"></p>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-confirm" id="modal-confirm-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let sessions = [];
+  let selectedSessionId = null;
+  let sidebarOpen = true;
+  let deleteTargetId = null;
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  function copyCode(elId, btn) {
+    navigator.clipboard.writeText(document.getElementById(elId).textContent).then(() => {
+      const orig = btn.innerHTML;
+      btn.innerHTML = `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Copied`;
+      btn.style.color = '#4ade80';
+      setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; }, 2000);
+    });
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function openModal(id) {
+    deleteTargetId = id;
+    const s = sessions.find(x => x.id === id);
+    document.getElementById('modal-desc').textContent =
+      `This will permanently delete "${s?.title}" and all its refinements.`;
+    document.getElementById('modal-overlay').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('show');
+    deleteTargetId = null;
+  }
+
+  document.getElementById('modal-confirm-btn').addEventListener('click', async () => {
+    if (!deleteTargetId) return;
+    await deleteSession(deleteTargetId);
+    closeModal();
+  });
+
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  });
+
+  document.getElementById('toggle-btn').addEventListener('click', () => {
+    sidebarOpen = !sidebarOpen;
+    document.getElementById('sidebar').classList.toggle('collapsed', !sidebarOpen);
+    document.getElementById('toggle-icon').innerHTML = sidebarOpen
+      ? `<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>`
+      : `<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>`;
+  });
+
+  async function loadSessions() {
+    const res = await fetch('/api/refine/sessions');
+    sessions = await res.json();
+    renderSessions();
+  }
+
+  async function createSession(title, language) {
+    const res = await fetch('/api/refine/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, language })
+    });
+    return await res.json();
+  }
+
+  async function deleteSession(id) {
+    await fetch(`/api/refine/sessions/${id}`, { method: 'DELETE' });
+    if (selectedSessionId === id) {
+      selectedSessionId = null;
+      updateTopbar(null);
+      showOutputState('empty');
+    }
+    await loadSessions();
+    showToast('Session deleted.');
+  }
+
+  async function loadSession(id) {
+    const res = await fetch(`/api/refine/sessions/${id}`);
+    return await res.json();
+  }
+
+  function renderSessions() {
+    const list = document.getElementById('session-list');
+    if (!sessions.length) {
+      list.innerHTML = `<div class="sidebar-empty">No sessions yet.<br/>Start a new session above.</div>`;
+      return;
+    }
+    const sorted = [...sessions].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    list.innerHTML = sorted.map(s => `
+      <div class="session-item ${s.id === selectedSessionId ? 'active' : ''}" onclick="selectSession(${s.id})">
+        <div class="session-info">
+          <div class="session-name">${escapeHtml(s.title)}</div>
+          <span class="session-badge">${escapeHtml(s.language)}</span>
+        </div>
+        <button class="session-delete" onclick="event.stopPropagation();openModal(${s.id})">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </button>
+      </div>
+    `).join('');
+  }
+
+  function updateTopbar(session) {
+    document.getElementById('topbar-title-text').textContent = session ? session.title : 'Code Refine AI';
+    const badge = document.getElementById('topbar-lang-badge');
+    badge.textContent = session?.language ?? '';
+    badge.style.display = session ? 'inline-block' : 'none';
+  }
+
+  function showOutputState(state) {
+    document.getElementById('empty-state').style.display = state === 'empty' ? 'flex' : 'none';
+    document.getElementById('streaming-box').style.display = state === 'streaming' ? 'block' : 'none';
+    document.getElementById('stream-text').style.display = 'none';
+    document.getElementById('result-box').style.display = state === 'result' ? 'block' : 'none';
+    document.getElementById('history-box').style.display = state === 'history' ? 'block' : 'none';
+  }
+
+  function renderResult(refinedCode, explanation, language, errorChanges, originalCode) {
+    document.getElementById('result-lang-label').textContent = language;
+    document.getElementById('result-code-content').textContent = refinedCode;
+    document.getElementById('result-explanation').textContent = explanation;
+    
+    // Show comparison if we have original code
+    if (originalCode && errorChanges && errorChanges.length > 0) {
+      const compContainer = document.getElementById('comparison-container');
+      compContainer.innerHTML = `
+        <div class="comparison-panel">
+          <div class="comparison-header bad">❌ Original Code (With Errors)</div>
+          <pre><code style="background: var(--code-bg); padding: 16px; margin: 0; color: var(--code-fg); font-family: var(--mono); font-size: 13px; white-space: pre;">${escapeHtml(originalCode)}</code></pre>
+        </div>
+        <div class="comparison-panel">
+          <div class="comparison-header good">✅ Refined Code (Fixed)</div>
+          <pre><code style="background: var(--code-bg); padding: 16px; margin: 0; color: var(--code-fg); font-family: var(--mono); font-size: 13px; white-space: pre;">${escapeHtml(refinedCode)}</code></pre>
+        </div>
+      `;
+      document.getElementById('comparison-section').style.display = 'block';
+    }
+    
+    // Show error changes
+    if (errorChanges && errorChanges.length > 0) {
+      const changesContainer = document.getElementById('changes-container');
+      changesContainer.innerHTML = errorChanges.map(change => `
+        <div class="change-item">
+          <div class="change-title">🔴 ${escapeHtml(change.error)}</div>
+          <div style="margin: 8px 0; font-size: 12px;">
+            <strong style="color: #dc2626;">Before:</strong>
+            <code style="background: rgba(220,38,38,0.1); padding: 2px 6px; border-radius: 3px; color: var(--code-fg);">${escapeHtml(change.before)}</code>
+          </div>
+          <div style="margin: 8px 0; font-size: 12px;">
+            <strong style="color: #16a34a;">After:</strong>
+            <code style="background: rgba(22,163,74,0.1); padding: 2px 6px; border-radius: 3px; color: var(--code-fg);">${escapeHtml(change.after)}</code>
+          </div>
+          <div class="change-reason"><strong>Why:</strong> ${escapeHtml(change.reason)}</div>
+        </div>
+      `).join('');
+      document.getElementById('changes-section').style.display = 'block';
+    }
+    
+    showOutputState('result');
+  }
+
+  function renderHistory(refinements) {
+    document.getElementById('refinement-count').textContent =
+      refinements.length ? `${refinements.length} refinement${refinements.length > 1 ? 's' : ''}` : '';
+    if (!refinements.length) { showOutputState('empty'); return; }
+    const sorted = [...refinements].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    document.getElementById('history-items').innerHTML = sorted.map((r, i) => `
+      <div class="history-item">
+        <div class="history-meta">
+          <span class="history-lang-badge">${escapeHtml(r.language)}</span>
+          <span class="history-time">${new Date(r.createdAt).toLocaleString()}</span>
+          ${i === 0 ? '<span class="history-latest">Latest</span>' : ''}
+        </div>
+        <div style="margin-bottom:10px">
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-lang">${escapeHtml(r.language)}</span>
+              <button class="copy-btn" onclick="copyCode('hc-${r.id}',this)">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                Copy
+              </button>
+            </div>
+            <pre><code id="hc-${r.id}">${escapeHtml(r.refinedCode)}</code></pre>
+          </div>
+        </div>
+        <div class="explanation-box"><p>${escapeHtml(r.explanation)}</p></div>
+      </div>
+    `).join('');
+    showOutputState('history');
+  }
+
+  async function selectSession(id) {
+    selectedSessionId = id;
+    renderSessions();
+    updateTopbar(sessions.find(s => s.id === id));
+    showOutputState('empty');
+    const full = await loadSession(id);
+    renderHistory(full.refinements || []);
+  }
+
+  document.getElementById('new-session-btn').addEventListener('click', async () => {
+    const title = `Session ${new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}`;
+    const lang = document.getElementById('lang-select').value;
+    const s = await createSession(title, lang);
+    sessions.unshift(s);
+    selectedSessionId = s.id;
+    renderSessions();
+    updateTopbar(s);
+    showOutputState('empty');
+    document.getElementById('code-input').value = '';
+    document.getElementById('refinement-count').textContent = '';
+  });
+
+  document.getElementById('refine-btn').addEventListener('click', async () => {
+    const code = document.getElementById('code-input').value.trim();
+    const language = document.getElementById('lang-select').value;
+    if (!code) { showToast('Please paste your code first.'); return; }
+
+    let sessionId = selectedSessionId;
+    if (!sessionId) {
+      const title = `Session ${new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}`;
+      const s = await createSession(title, language);
+      sessions.unshift(s); selectedSessionId = s.id; sessionId = s.id;
+      renderSessions(); updateTopbar(s);
+    }
+
+    const btn = document.getElementById('refine-btn');
+    btn.disabled = true;
+    document.getElementById('refine-btn-text').textContent = 'Refining...';
+
+    showOutputState('streaming');
+    const streamText = document.getElementById('stream-text');
+    streamText.textContent = '';
+
+    try {
+      const response = await fetch(`/api/refine/sessions/${sessionId}/refine`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language })
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.chunk) {
+              streamText.style.display = 'block';
+              streamText.textContent += data.chunk;
+              streamText.scrollTop = streamText.scrollHeight;
+            }
+            if (data.done && data.refinedCode) {
+              renderResult(data.refinedCode, data.explanation, language, data.errorChanges, code);
+              await loadSessions();
+            }
+          } catch {}
+        }
+      }
+    } catch {
+      showOutputState('empty');
+      showToast('Refinement failed. Please try again.');
+    } finally {
+      btn.disabled = false;
+      document.getElementById('refine-btn-text').textContent = 'Refine Code';
+    }
+  });
+
+  loadSessions();
+</script>
+</body>
+</html>
